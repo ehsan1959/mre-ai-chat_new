@@ -1,0 +1,3883 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>MRE AI - Smart Assistant</title>
+
+    <!-- Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
+    <!-- Libraries -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Noto+Sans+Bengali:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/styles/atom-one-dark.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.8.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.5/purify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #ff6b8b;
+            --primary-light: #ff8fa3;
+            --primary-dark: #e85a7a;
+            --primary-gradient: linear-gradient(135deg, #ff6b8b 0%, #ff9a8b 100%);
+            --primary-glow: rgba(255, 107, 139, 0.4);
+
+            --bg-dark: #000000;
+            --bg-dark-elevated: #0a0a0a;
+            --bg-dark-card: #1c1c1e;
+            --bg-dark-input: #2c2c2e;
+
+            --text-dark: #ffffff;
+            --text-dark-secondary: rgba(255,255,255,0.6);
+            --text-dark-tertiary: rgba(255,255,255,0.4);
+
+            --border-dark: rgba(255,255,255,0.1);
+
+            --font-main: 'Inter', 'Noto Sans Bengali', sans-serif;
+            --safe-top: env(safe-area-inset-top);
+            --safe-bottom: env(safe-area-inset-bottom);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+            font-family: var(--font-main);
+        }
+
+        body {
+            background: var(--bg-dark);
+            color: var(--text-dark);
+            height: 100vh;
+            height: 100dvh;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
+            font-size: 16px;
+        }
+
+        /* Loading Screen */
+        .loading-screen {
+            position: fixed;
+            inset: 0;
+            background: var(--bg-dark);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 99999;
+            transition: opacity 0.5s ease, visibility 0.5s;
+        }
+
+        .loading-screen.hide {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+
+        .loading-logo {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 24px;
+            box-shadow: 0 0 60px var(--primary-glow);
+            animation: pulse 2s ease-in-out infinite;
+            overflow: hidden;
+            background: var(--bg-dark-card);
+            border: 3px solid var(--primary);
+        }
+
+        .loading-logo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; box-shadow: 0 0 60px var(--primary-glow); }
+            50% { transform: scale(1.05); opacity: 0.9; box-shadow: 0 0 80px var(--primary-glow); }
+        }
+
+        .loading-text {
+            font-size: 28px;
+            font-weight: 800;
+            background: var(--primary-gradient);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+
+        .loading-subtitle {
+            font-size: 14px;
+            color: var(--text-dark-secondary);
+        }
+
+        /* Toast Notification */
+        .toast-container {
+            position: fixed;
+            top: calc(20px + var(--safe-top));
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 100000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            width: 90%;
+            max-width: 400px;
+            pointer-events: none;
+        }
+
+        .toast {
+            background: var(--bg-dark-card);
+            border: 1px solid var(--border-dark);
+            border-radius: 16px;
+            padding: 16px 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            animation: toastIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            pointer-events: auto;
+            backdrop-filter: blur(20px);
+        }
+
+        @keyframes toastIn {
+            from { opacity: 0; transform: translateY(-30px) scale(0.9); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .toast-icon {
+            width: 44px;
+            height: 44px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 22px;
+            flex-shrink: 0;
+        }
+
+        .toast.success .toast-icon { background: rgba(34, 197, 94, 0.15); color: #22c55e; }
+        .toast.error .toast-icon { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+        .toast.info .toast-icon { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+
+        /* Auth Screen */
+        .auth-container {
+            position: fixed;
+            inset: 0;
+            display: none;
+            flex-direction: column;
+            background: var(--bg-dark);
+            overflow-y: auto;
+            z-index: 1000;
+        }
+
+        .auth-container.active {
+            display: flex;
+        }
+
+        .auth-header {
+            height: 40vh;
+            min-height: 280px;
+            background: var(--primary-gradient);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .auth-logo-large {
+            width: 100px;
+            height: 100px;
+            background: white;
+            border-radius: 24px;
+            padding: 3px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+            animation: float 3s ease-in-out infinite;
+            overflow: hidden;
+        }
+
+        .auth-logo-large img {
+            width: 100%;
+            height: 100%;
+            border-radius: 21px;
+            object-fit: cover;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .auth-header h1 {
+            margin-top: 16px;
+            color: white;
+            font-size: 32px;
+            font-weight: 800;
+        }
+
+        .auth-header p {
+            color: rgba(255,255,255,0.9);
+            font-size: 15px;
+            margin-top: 6px;
+        }
+
+        .auth-body {
+            flex: 1;
+            background: var(--bg-dark);
+            margin-top: -24px;
+            border-radius: 24px 24px 0 0;
+            padding: 28px 20px;
+            position: relative;
+        }
+
+        .auth-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 24px;
+            background: var(--bg-dark-card);
+            padding: 4px;
+            border-radius: 14px;
+        }
+
+        .auth-tab {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            background: transparent;
+            color: var(--text-dark-secondary);
+            font-size: 14px;
+            font-weight: 600;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+
+        .auth-tab.active {
+            background: var(--primary-gradient);
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 16px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-dark-secondary);
+            text-transform: uppercase;
+        }
+
+        .input-wrapper {
+            position: relative;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 14px 14px 14px 44px;
+            background: var(--bg-dark-card);
+            border: 1px solid var(--border-dark);
+            border-radius: 12px;
+            color: var(--text-dark);
+            font-size: 15px;
+            transition: all 0.3s;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .input-icon {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-dark-secondary);
+            font-size: 16px;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 14px;
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 6px;
+        }
+
+        .google-btn {
+            width: 100%;
+            margin-top: 14px;
+            padding: 14px;
+            background: var(--bg-dark-card);
+            border: 1px solid var(--border-dark);
+            border-radius: 12px;
+            color: var(--text-dark);
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            transition: all 0.2s;
+        }
+
+        .google-btn:hover {
+            border-color: var(--primary);
+        }
+
+        .google-btn i {
+            color: #ea4335;
+            font-size: 18px;
+        }
+
+        .divider {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 20px 0;
+        }
+
+        .divider-line {
+            flex: 1;
+            height: 1px;
+            background: var(--border-dark);
+        }
+
+        .divider-text {
+            font-size: 12px;
+            color: var(--text-dark-secondary);
+        }
+
+        /* App Layout */
+        .app-layout {
+            display: none;
+            height: 100vh;
+            height: 100dvh;
+            flex-direction: column;
+        }
+
+        .app-layout.active {
+            display: flex;
+        }
+
+        /* Header */
+        .app-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            padding-top: calc(12px + var(--safe-top));
+            background: var(--bg-dark);
+            border-bottom: 1px solid var(--border-dark);
+            z-index: 100;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .menu-toggle {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            background: transparent;
+            border: none;
+            color: var(--text-dark);
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .brand-text {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .header-btn {
+            height: 36px;
+            padding: 0 14px;
+            border-radius: 18px;
+            background: var(--primary-gradient);
+            border: none;
+            color: white;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+        }
+
+        /* Sidebar */
+        .sidebar-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.8);
+            z-index: 999;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s;
+        }
+
+        .sidebar-overlay.active {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .sidebar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 80%;
+            max-width: 320px;
+            height: 100%;
+            height: 100dvh;
+            background: var(--bg-dark-elevated);
+            z-index: 1000;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .sidebar.active {
+            transform: translateX(0);
+        }
+
+        .sidebar-header {
+            padding: 24px;
+            padding-top: calc(24px + var(--safe-top));
+            background: var(--primary-gradient);
+        }
+
+        .user-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .user-avatar-large {
+            width: 56px;
+            height: 56px;
+            border-radius: 50% !important;
+            background: white;
+            padding: 2px;
+            overflow: hidden;
+            flex-shrink: 0;
+        }
+
+        .user-avatar-large img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50% !important;
+            object-fit: cover;
+            display: block;
+        }
+
+        .user-avatar-large .avatar-initial {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--primary-gradient);
+            color: white;
+            font-size: 24px;
+            font-weight: 700;
+        }
+
+        .user-info h3 {
+            color: white;
+            font-size: 18px;
+            font-weight: 700;
+        }
+
+        .user-info p {
+            color: rgba(255,255,255,0.8);
+            font-size: 13px;
+        }
+
+        .sidebar-stats {
+            display: flex;
+            gap: 24px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .stat {
+            text-align: center;
+            color: white;
+        }
+
+        .stat-value {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.8;
+        }
+
+        .sidebar-nav {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+        }
+
+        .nav-section {
+            margin-bottom: 20px;
+        }
+
+        .nav-title {
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dark-secondary);
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            padding: 0 12px;
+        }
+
+        .nav-item {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 12px;
+            border-radius: 12px;
+            color: var(--text-dark);
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-bottom: 2px;
+        }
+
+        .nav-item:hover, .nav-item.active {
+            background: var(--bg-dark-card);
+        }
+
+        .nav-item i {
+            width: 20px;
+            font-size: 18px;
+            color: var(--primary);
+        }
+
+        .nav-item span {
+            flex: 1;
+            font-weight: 500;
+            font-size: 15px;
+        }
+
+        .nav-badge {
+            background: var(--primary);
+            color: white;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .sidebar-footer {
+            padding: 16px;
+            border-top: 1px solid var(--border-dark);
+        }
+
+        .logout-btn {
+            width: 100%;
+            padding: 14px;
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            border-radius: 12px;
+            color: #ef4444;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        /* Home UI */
+        .chat-container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+            padding-bottom: 180px;
+            scroll-behavior: smooth;
+        }
+
+        .welcome-screen-new {
+            display: flex;
+            flex-direction: column;
+            animation: fadeIn 0.5s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .ai-avatar-large {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            color: white;
+            margin-bottom: 20px;
+            box-shadow: 0 0 30px rgba(59, 130, 246, 0.4);
+            animation: avatarPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes avatarPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+
+        .welcome-text {
+            font-size: 26px;
+            line-height: 1.4;
+            color: var(--text-dark);
+            margin-bottom: 24px;
+            font-weight: 400;
+        }
+
+        .welcome-text strong {
+            font-weight: 600;
+        }
+
+        .suggestion-pills {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .suggestion-pill {
+            padding: 16px 20px;
+            background: var(--bg-dark-card);
+            border: 1px solid var(--border-dark);
+            border-radius: 16px;
+            font-size: 15px;
+            color: var(--text-dark);
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+            line-height: 1.5;
+        }
+
+        .suggestion-pill:hover {
+            border-color: var(--primary);
+        }
+
+        .quick-chips {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+
+        .quick-chips::-webkit-scrollbar {
+            display: none;
+        }
+
+        .quick-chip {
+            padding: 10px 18px;
+            background: var(--bg-dark-card);
+            border: 1px solid var(--border-dark);
+            border-radius: 20px;
+            font-size: 14px;
+            color: var(--text-dark);
+            cursor: pointer;
+            transition: all 0.2s;
+            white-space: nowrap;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .quick-chip:hover {
+            border-color: var(--primary);
+        }
+
+        /* Messages */
+        .message {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 20px;
+            animation: messageSlide 0.3s ease;
+            width: 100%;
+        }
+
+        @keyframes messageSlide {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user {
+            align-items: flex-end;
+        }
+
+        .message.ai {
+            align-items: flex-start;
+        }
+
+        .message-wrapper {
+            max-width: 85%;
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .message.user .message-wrapper {
+            flex-direction: row-reverse;
+        }
+
+        .message-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            flex-shrink: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+
+        .message.user .message-avatar {
+            background: var(--primary-gradient);
+            color: white;
+        }
+
+        .message.ai .message-avatar {
+            background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+            color: white;
+        }
+
+        .message-avatar img {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            object-fit: cover;
+        }
+
+        .message-content {
+            padding: 14px 18px;
+            border-radius: 20px;
+            font-size: 15px;
+            line-height: 1.6;
+            background: var(--bg-dark-card);
+            border: 1px solid var(--border-dark);
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+            max-width: 100%;
+        }
+
+        .message.user .message-content {
+            background: var(--primary-gradient);
+            color: white;
+            border: none;
+        }
+
+        /* Message Edit Mode */
+        .message-content.editing {
+            background: var(--bg-dark-input);
+            border: 2px solid var(--primary);
+            padding: 12px 16px;
+            min-width: 250px;
+        }
+
+        .edit-textarea {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: var(--text-dark);
+            font-size: 15px;
+            line-height: 1.5;
+            resize: none;
+            outline: none;
+            font-family: inherit;
+            min-height: 60px;
+        }
+
+        .edit-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 8px;
+            justify-content: flex-end;
+        }
+
+        .edit-btn {
+            padding: 6px 12px;
+            border-radius: 8px;
+            border: none;
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+
+        .edit-btn.save {
+            background: var(--primary-gradient);
+            color: white;
+        }
+
+        .edit-btn.cancel {
+            background: var(--bg-dark-card);
+            color: var(--text-dark-secondary);
+        }
+
+        .message-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 6px;
+            opacity: 0;
+            transition: opacity 0.2s;
+            padding: 0 42px;
+        }
+
+        .message:hover .message-actions {
+            opacity: 1;
+        }
+
+        .message-action-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-dark-secondary);
+            font-size: 12px;
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .message-action-btn:hover {
+            color: var(--primary);
+            background: rgba(255,107,139,0.1);
+        }
+
+        /* Streaming Text Animation - Kimi AI Style */
+        .streaming-char {
+            display: inline;
+            opacity: 0;
+            animation: charFadeIn 0.08s ease forwards;
+        }
+
+        @keyframes charFadeIn {
+            from { opacity: 0; transform: translateY(2px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Input Area */
+        .input-area {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 16px;
+            padding-bottom: calc(16px + var(--safe-bottom));
+            background: var(--bg-dark);
+            border-top: 1px solid var(--border-dark);
+            z-index: 50;
+        }
+
+        .input-wrapper-main {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--bg-dark-card);
+            border: 1px solid var(--border-dark);
+            border-radius: 24px;
+            padding: 4px 4px 4px 16px;
+            transition: border-color 0.3s;
+        }
+
+        .input-wrapper-main:focus-within {
+            border-color: var(--primary);
+        }
+
+        .input-wrapper-main.disabled {
+            opacity: 0.6;
+            pointer-events: none;
+            background: var(--bg-dark-elevated);
+        }
+
+        .input-icon-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: transparent;
+            border: none;
+            color: var(--text-dark-secondary);
+            font-size: 20px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+
+        .input-icon-btn:hover {
+            color: var(--primary);
+            background: rgba(255,107,139,0.1);
+        }
+
+        .input-icon-btn.recording {
+            color: var(--primary);
+            animation: pulse-recording 1.5s infinite;
+        }
+
+        @keyframes pulse-recording {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(255, 107, 139, 0.4); }
+            50% { box-shadow: 0 0 0 8px rgba(255, 107, 139, 0); }
+        }
+
+        .message-input {
+            flex: 1;
+            border: none;
+            outline: none;
+            background: transparent;
+            color: var(--text-dark);
+            font-size: 16px;
+            padding: 12px 0;
+            resize: none;
+            max-height: 100px;
+            font-family: inherit;
+        }
+
+        .message-input::placeholder {
+            color: var(--text-dark-tertiary);
+        }
+
+        .message-input:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .send-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: var(--primary-gradient);
+            border: none;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            transition: all 0.2s;
+        }
+
+        .send-btn:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px var(--primary-glow);
+        }
+
+        .send-btn.stop-mode {
+            background: #ef4444;
+            animation: pulse-red 1.5s infinite;
+        }
+
+        @keyframes pulse-red {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+            50% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+        }
+
+        /* Typing Indicator */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 20px;
+            padding-left: 0;
+            animation: messageSlide 0.3s ease;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .typing-indicator .message-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .typing-bubble {
+            background: var(--bg-dark-card);
+            border: 1px solid var(--border-dark);
+            border-radius: 18px;
+            padding: 16px 20px;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            flex-shrink: 0;
+        }
+
+        .typing-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--primary);
+            border-radius: 50%;
+            animation: typingBounce 1.4s infinite ease-in-out both;
+        }
+
+        .typing-dot:nth-child(1) { animation-delay: -0.32s; }
+        .typing-dot:nth-child(2) { animation-delay: -0.16s; }
+
+        @keyframes typingBounce {
+            0%, 80%, 100% { transform: scale(0.6); opacity: 0.5; }
+            40% { transform: scale(1); opacity: 1; }
+        }
+
+        /* Code Block Styling */
+        .code-block {
+            background: #1e1e1e;
+            border-radius: 8px;
+            margin: 8px 0;
+            overflow: hidden;
+            border: 1px solid var(--border-dark);
+        }
+
+        .code-header {
+            background: #2d2d2d;
+            padding: 8px 12px;
+            font-size: 12px;
+            color: #888;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .code-header span {
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .copy-btn {
+            background: transparent;
+            border: 1px solid #555;
+            color: #aaa;
+            padding: 4px 12px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+
+        .copy-btn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .code-block pre {
+            padding: 12px;
+            margin: 0;
+            overflow-x: auto;
+            background: #1e1e1e;
+            white-space: pre !important;
+            word-wrap: normal !important;
+            word-break: normal !important;
+            tab-size: 4;
+            -moz-tab-size: 4;
+        }
+
+        .code-block code {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre !important;
+            display: block;
+            word-wrap: normal !important;
+            word-break: normal !important;
+        }
+
+        /* Inline Code */
+        code.inline-code {
+            background: rgba(255,107,139,0.15);
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.9em;
+            color: var(--primary-light);
+        }
+
+        /* Chart Container */
+        .chart-container {
+            background: var(--bg-dark-card);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 12px 0;
+            border: 1px solid var(--border-dark);
+        }
+
+        /* Image Generation */
+        .generated-image {
+            width: 100%;
+            border-radius: 12px;
+            margin-top: 12px;
+            border: 1px solid var(--border-dark);
+        }
+
+        /* File Preview */
+        .file-preview {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: var(--bg-dark-input);
+            padding: 12px 16px;
+            border-radius: 12px;
+            margin-bottom: 12px;
+            border: 1px solid var(--border-dark);
+        }
+
+        .file-preview i {
+            font-size: 24px;
+            color: var(--primary);
+        }
+
+        .file-info {
+            flex: 1;
+        }
+
+        .file-name {
+            font-weight: 600;
+            font-size: 14px;
+        }
+
+        .file-size {
+            font-size: 12px;
+            color: var(--text-dark-secondary);
+        }
+
+        .remove-file {
+            background: transparent;
+            border: none;
+            color: var(--text-dark-secondary);
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        /* Web Search Results */
+        .search-results {
+            background: var(--bg-dark-card);
+            border-radius: 12px;
+            padding: 16px;
+            margin: 12px 0;
+            border: 1px solid var(--border-dark);
+        }
+
+        .search-result-item {
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-dark);
+        }
+
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+
+        .search-result-title {
+            color: var(--primary);
+            font-weight: 600;
+            margin-bottom: 4px;
+            cursor: pointer;
+        }
+
+        .search-result-url {
+            font-size: 12px;
+            color: var(--text-dark-secondary);
+            margin-bottom: 4px;
+        }
+
+        .search-result-snippet {
+            font-size: 14px;
+            color: var(--text-dark-secondary);
+        }
+
+        /* Modals */
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            z-index: 10000;
+            display: none;
+            align-items: flex-end;
+            justify-content: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+            opacity: 1;
+        }
+
+        .modal-sheet {
+            background: var(--bg-dark-elevated);
+            width: 100%;
+            max-height: 90vh;
+            border-radius: 24px 24px 0 0;
+            padding: 24px;
+            padding-bottom: calc(24px + var(--safe-bottom));
+            transform: translateY(100%);
+            transition: transform 0.3s ease;
+            overflow-y: auto;
+        }
+
+        .modal-overlay.active .modal-sheet {
+            transform: translateY(0);
+        }
+
+        .modal-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 24px;
+        }
+
+        .modal-title {
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        .modal-close {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--bg-dark-card);
+            border: none;
+            color: var(--text-dark);
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Developer Screen */
+        .developer-screen {
+            background: var(--bg-dark);
+            min-height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 40px 24px;
+            text-align: center;
+        }
+
+        .developer-avatar {
+            width: 140px;
+            height: 140px;
+            background: var(--primary-gradient);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 64px;
+            font-weight: 800;
+            color: white;
+            margin: 40px 0 24px;
+            box-shadow: 0 0 60px var(--primary-glow);
+            position: relative;
+        }
+
+        .developer-avatar::after {
+            content: '';
+            position: absolute;
+            inset: -10px;
+            border-radius: 50%;
+            background: var(--primary-gradient);
+            opacity: 0.3;
+            filter: blur(20px);
+            z-index: -1;
+        }
+
+        .developer-name {
+            font-size: 32px;
+            font-weight: 700;
+            color: var(--text-dark);
+            margin-bottom: 8px;
+        }
+
+        .developer-role {
+            font-size: 16px;
+            color: var(--text-dark-secondary);
+            margin-bottom: 40px;
+        }
+
+        .developer-info-card {
+            width: 100%;
+            background: var(--bg-dark-card);
+            border-radius: 20px;
+            padding: 8px;
+            border: 1px solid var(--border-dark);
+        }
+
+        .developer-info-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px;
+            border-radius: 12px;
+        }
+
+        .developer-info-item:not(:last-child) {
+            border-bottom: 1px solid var(--border-dark);
+        }
+
+        .info-icon {
+            width: 48px;
+            height: 48px;
+            background: rgba(255, 107, 139, 0.1);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--primary);
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .info-content {
+            text-align: left;
+            flex: 1;
+        }
+
+        .info-label {
+            font-size: 12px;
+            color: var(--text-dark-secondary);
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .info-value {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--text-dark);
+            word-break: break-all;
+        }
+
+        /* Credits Modal */
+        .payment-card {
+            background: var(--primary-gradient);
+            border-radius: 20px;
+            padding: 24px;
+            text-align: center;
+            color: white;
+            margin-bottom: 20px;
+        }
+
+        .payment-number {
+            font-size: 28px;
+            font-weight: 700;
+            margin: 8px 0;
+        }
+
+        .package-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .package {
+            background: var(--bg-dark-card);
+            border: 2px solid transparent;
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .package.selected {
+            border-color: var(--primary);
+        }
+
+        .package-credits {
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .package-price {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 4px 0;
+        }
+
+        .transaction-input {
+            width: 100%;
+            padding: 16px;
+            background: var(--bg-dark-card);
+            border: 1px solid var(--border-dark);
+            border-radius: 12px;
+            color: var(--text-dark);
+            font-size: 16px;
+            text-align: center;
+            margin-bottom: 12px;
+        }
+
+        .submit-payment-btn {
+            width: 100%;
+            padding: 16px;
+            background: var(--primary-gradient);
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+        }
+
+        .submit-payment-btn:disabled {
+            opacity: 0.5;
+        }
+
+        /* Upload Modal */
+        .upload-options {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .upload-option {
+            background: var(--bg-dark-card);
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .upload-option:hover {
+            border-color: var(--primary);
+        }
+
+        .upload-option i {
+            font-size: 32px;
+            color: var(--primary);
+            margin-bottom: 8px;
+            display: block;
+        }
+
+        /* Settings */
+        .settings-section {
+            margin-bottom: 24px;
+        }
+
+        .settings-label {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-dark-secondary);
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+
+        .theme-options {
+            display: flex;
+            gap: 10px;
+        }
+
+        .theme-option {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            position: relative;
+            transition: transform 0.2s;
+        }
+
+        .theme-option:hover {
+            transform: scale(1.1);
+        }
+
+        .theme-option.active {
+            border-color: white;
+            box-shadow: 0 0 0 2px var(--primary);
+        }
+
+        .theme-option[data-color="pink"] { background: linear-gradient(135deg, #ff6b8b 0%, #ff9a8b 100%); }
+        .theme-option[data-color="blue"] { background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%); }
+        .theme-option[data-color="green"] { background: linear-gradient(135deg, #10b981 0%, #34d399 100%); }
+        .theme-option[data-color="purple"] { background: linear-gradient(135deg, #8b5cf6 0%, #a78bfa 100%); }
+
+        .theme-option i {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-size: 20px;
+            opacity: 0;
+        }
+
+        .theme-option.active i {
+            opacity: 1;
+        }
+
+        /* History List */
+        .history-list {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .history-item {
+            background: var(--bg-dark-card);
+            border-radius: 12px;
+            padding: 16px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .history-item:hover {
+            border-color: var(--primary);
+        }
+
+        .history-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .history-date {
+            font-size: 12px;
+            color: var(--text-dark-secondary);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-dark-secondary);
+        }
+
+        /* Memory Panel */
+        .memory-panel {
+            background: var(--bg-dark-card);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            border: 1px solid var(--border-dark);
+        }
+
+        .memory-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border-dark);
+        }
+
+        .memory-item:last-child {
+            border-bottom: none;
+        }
+
+        .memory-key {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .memory-value {
+            color: var(--text-dark-secondary);
+            font-size: 14px;
+        }
+
+        /* Utility */
+        .hide { display: none !important; }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-dark);
+            border-radius: 3px;
+        }
+
+        /* Responsive Fixes */
+        @media (max-width: 380px) {
+            .brand-text { font-size: 18px; }
+            .message-wrapper { max-width: 90%; }
+            .welcome-text { font-size: 22px; }
+        }
+
+        /* Voice Wave Animation */
+        .voice-wave {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            height: 24px;
+        }
+
+        .voice-bar {
+            width: 3px;
+            background: var(--primary);
+            border-radius: 3px;
+            animation: voiceWave 1s ease-in-out infinite;
+        }
+
+        .voice-bar:nth-child(1) { animation-delay: 0s; height: 8px; }
+        .voice-bar:nth-child(2) { animation-delay: 0.1s; height: 16px; }
+        .voice-bar:nth-child(3) { animation-delay: 0.2s; height: 24px; }
+        .voice-bar:nth-child(4) { animation-delay: 0.3s; height: 16px; }
+        .voice-bar:nth-child(5) { animation-delay: 0.4s; height: 8px; }
+
+        @keyframes voiceWave {
+            0%, 100% { transform: scaleY(0.5); opacity: 0.5; }
+            50% { transform: scaleY(1); opacity: 1; }
+        }
+
+        /* Canvas Mode */
+        .canvas-container {
+            background: var(--bg-dark-card);
+            border-radius: 12px;
+            border: 1px solid var(--border-dark);
+            margin: 12px 0;
+            overflow: hidden;
+        }
+
+        .canvas-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 12px 16px;
+            background: var(--bg-dark-input);
+            border-bottom: 1px solid var(--border-dark);
+        }
+
+        .canvas-tabs {
+            display: flex;
+            gap: 8px;
+        }
+
+        .canvas-tab {
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            cursor: pointer;
+            background: transparent;
+            border: none;
+            color: var(--text-dark-secondary);
+        }
+
+        .canvas-tab.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        .canvas-content {
+            padding: 16px;
+            min-height: 200px;
+        }
+
+        .canvas-editor {
+            width: 100%;
+            min-height: 200px;
+            background: transparent;
+            border: none;
+            color: var(--text-dark);
+            font-family: 'Consolas', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            resize: vertical;
+            outline: none;
+        }
+
+        .canvas-preview {
+            background: var(--bg-dark);
+            border-radius: 8px;
+            padding: 16px;
+            min-height: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div class="toast-container" id="toastContainer"></div>
+
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-logo">
+            <img src="https://i.postimg.cc/RhcKP9hW/circle-cropped.png" alt="MRE AI Logo">
+        </div>
+        <div class="loading-text">MRE AI</div>
+        <div class="loading-subtitle">Loading your AI assistant...</div>
+    </div>
+
+    <!-- Auth Container -->
+    <div class="auth-container" id="authContainer">
+        <div class="auth-header">
+            <div class="auth-logo-large">
+                <img src="https://i.postimg.cc/RhcKP9hW/circle-cropped.png" alt="MRE AI Logo">
+            </div>
+            <h1>MRE AI</h1>
+            <p>Your Smart Assistant</p>
+        </div>
+        <div class="auth-body">
+            <div class="auth-tabs">
+                <button class="auth-tab active" onclick="switchTab('signup')">Sign Up</button>
+                <button class="auth-tab" onclick="switchTab('login')">Log In</button>
+            </div>
+
+            <form id="signupForm" class="auth-form" onsubmit="handleSignup(event)">
+                <div class="form-group">
+                    <label class="form-label">Full Name</label>
+                    <div class="input-wrapper">
+                        <i class="fas fa-user input-icon"></i>
+                        <input type="text" id="signupName" class="form-input" placeholder="Your name" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <div class="input-wrapper">
+                        <i class="fas fa-envelope input-icon"></i>
+                        <input type="email" id="signupEmail" class="form-input" placeholder="email@example.com" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <div class="input-wrapper">
+                        <i class="fas fa-lock input-icon"></i>
+                        <input type="password" id="signupPassword" class="form-input" placeholder="••••••••" required minlength="6">
+                    </div>
+                </div>
+                <button type="submit" class="submit-btn" id="signupBtn">
+                    <i class="fas fa-user-plus"></i> Create Account
+                </button>
+                <div style="text-align: center; margin-top: 12px; color: var(--primary); font-size: 14px; font-weight: 600;">
+                    <i class="fas fa-gift"></i> Get 40 Free Credits!
+                </div>
+            </form>
+
+            <form id="loginForm" class="auth-form hide" onsubmit="handleLogin(event)">
+                <div class="form-group">
+                    <label class="form-label">Email</label>
+                    <div class="input-wrapper">
+                        <i class="fas fa-envelope input-icon"></i>
+                        <input type="email" id="loginEmail" class="form-input" placeholder="email@example.com" required>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Password</label>
+                    <div class="input-wrapper">
+                        <i class="fas fa-lock input-icon"></i>
+                        <input type="password" id="loginPassword" class="form-input" placeholder="••••••••" required>
+                    </div>
+                </div>
+                <button type="submit" class="submit-btn" id="loginBtn">
+                    <i class="fas fa-sign-in-alt"></i> Sign In
+                </button>
+            </form>
+
+            <div class="divider">
+                <div class="divider-line"></div>
+                <span class="divider-text">OR</span>
+                <div class="divider-line"></div>
+            </div>
+
+            <button class="google-btn" id="googleSignInBtn" onclick="handleGoogleSignIn()">
+                <i class="fab fa-google"></i>
+                <span id="googleBtnText">Continue with Google</span>
+            </button>
+            
+            <div id="redirectStatus" style="text-align: center; margin-top: 12px; font-size: 13px; color: var(--text-dark-secondary); display: none;">
+                <i class="fas fa-spinner fa-spin"></i> Completing sign in...
+            </div>
+        </div>
+    </div>
+
+    <!-- App Layout -->
+    <div class="app-layout" id="appLayout">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-left">
+                <button class="menu-toggle" onclick="toggleSidebar()">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <span class="brand-text">MRE AI</span>
+            </div>
+            <div class="header-actions">
+                <button class="header-btn" onclick="openCreditsModal()">
+                    <i class="fas fa-coins"></i>
+                    <span id="creditDisplay">40</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Sidebar -->
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <div class="user-card">
+                    <div class="user-avatar-large" id="sidebarAvatar">
+                        <div class="avatar-initial">U</div>
+                    </div>
+                    <div class="user-info">
+                        <h3 id="sidebarName">User</h3>
+                        <p id="sidebarEmail">user@example.com</p>
+                    </div>
+                </div>
+                <div class="sidebar-stats">
+                    <div class="stat">
+                        <div class="stat-value" id="statCredits">40</div>
+                        <div class="stat-label">Credits</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="statChats">0</div>
+                        <div class="stat-label">Chats</div>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="sidebar-nav">
+                <div class="nav-section">
+                    <div class="nav-title">Menu</div>
+                    <div class="nav-item active" onclick="newChat()">
+                        <i class="fas fa-plus-circle"></i>
+                        <span>New Chat</span>
+                    </div>
+                    <div class="nav-item" onclick="openHistoryModal()">
+                        <i class="fas fa-history"></i>
+                        <span>History</span>
+                    </div>
+                    <div class="nav-item" onclick="openCreditsModal()">
+                        <i class="fas fa-coins"></i>
+                        <span>Buy Credits</span>
+                        <span class="nav-badge">Hot</span>
+                    </div>
+                    <div class="nav-item" onclick="openMemoryModal()">
+                        <i class="fas fa-brain"></i>
+                        <span>Memory</span>
+                    </div>
+                    <div class="nav-item" onclick="openCanvasModal()">
+                        <i class="fas fa-paint-brush"></i>
+                        <span>Canvas</span>
+                    </div>
+                </div>
+
+                <div class="nav-section">
+                    <div class="nav-title">Preferences</div>
+                    <div class="nav-item" onclick="openSettingsModal()">
+                        <i class="fas fa-cog"></i>
+                        <span>Settings</span>
+                    </div>
+                    <div class="nav-item" onclick="openDeveloperModal()">
+                        <i class="fas fa-code"></i>
+                        <span>Developer</span>
+                    </div>
+                </div>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="logout-btn" onclick="logout()">
+                    <i class="fas fa-sign-out-alt"></i> Logout
+                </button>
+            </div>
+        </aside>
+
+        <!-- Chat Container -->
+        <main class="chat-container" id="chatContainer">
+            <div class="welcome-screen-new" id="welcomeScreen">
+                <div class="ai-avatar-large">
+                    <i class="fas fa-robot"></i>
+                </div>
+                <div class="welcome-text">
+                    Hi <strong id="userFirstName">there</strong>, I'm MRE AI! I can understand বাংলা, English, and Banglish. Try asking me anything or upload an image.
+                </div>
+                <div class="suggestion-pills">
+                    <button class="suggestion-pill" onclick="quickAsk('Search for latest AI news')">
+                        <i class="fas fa-search"></i> Search for latest AI news
+                    </button>
+                    <button class="suggestion-pill" onclick="quickAsk('Generate an image of a futuristic city')">
+                        <i class="fas fa-image"></i> Generate an image of a futuristic city
+                    </button>
+                    <button class="suggestion-pill" onclick="quickAsk('Analyze this data and create a chart')">
+                        <i class="fas fa-chart-bar"></i> Analyze data and create chart
+                    </button>
+                    <button class="suggestion-pill" onclick="quickAsk('Explain quantum physics in simple terms')">
+                        Explain quantum physics in simple terms
+                    </button>
+                    <button class="suggestion-pill" onclick="quickAsk('Write a Python script to automate file organization')">
+                        Write a Python script to automate file organization
+                    </button>
+                    <button class="suggestion-pill" onclick="quickAsk('বাংলাদেশের ইতিহাস বলো')">
+                        বাংলাদেশের ইতিহাস বলো
+                    </button>
+                </div>
+                <div class="quick-chips">
+                    <button class="quick-chip" onclick="quickAsk('বাংলা')">
+                        <i class="fas fa-language"></i> বাংলা
+                    </button>
+                    <button class="quick-chip" onclick="quickAsk('English')">
+                        <i class="fas fa-globe"></i> English
+                    </button>
+                    <button class="quick-chip" onclick="quickAsk('Banglish')">
+                        <i class="fas fa-comments"></i> Banglish
+                    </button>
+                    <button class="quick-chip" onclick="quickAsk('Science')">
+                        <i class="fas fa-flask"></i> Science
+                    </button>
+                </div>
+            </div>
+        </main>
+
+        <!-- Input Area -->
+        <div class="input-area">
+            <div id="filePreviewContainer" class="hide" style="margin-bottom: 12px;"></div>
+            <div class="input-wrapper-main" id="inputWrapper">
+                <button class="input-icon-btn" onclick="openUploadModal()" id="uploadBtn">
+                    <i class="fas fa-plus"></i>
+                </button>
+                <textarea class="message-input" id="messageInput" placeholder="Ask away. Pics work too" rows="1" oninput="autoResize(this)"></textarea>
+                <button class="input-icon-btn" onclick="toggleVoiceInput()" id="voiceBtn">
+                    <i class="fas fa-microphone"></i>
+                </button>
+                <button class="send-btn" onclick="handleSendClick()" id="sendBtn">
+                    <i class="fas fa-paper-plane"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Credits Modal -->
+    <div class="modal-overlay" id="creditsModal">
+        <div class="modal-sheet">
+            <div class="modal-header">
+                <h3 class="modal-title">Buy Credits</h3>
+                <button class="modal-close" onclick="closeModal('creditsModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="payment-card">
+                <i class="fas fa-mobile-alt" style="font-size: 32px; margin-bottom: 8px;"></i>
+                <div style="font-size: 13px; opacity: 0.9;">Send money to bKash</div>
+                <div class="payment-number">01751674680</div>
+                <div style="font-size: 13px; opacity: 0.8;">Merchant: MRE AI</div>
+            </div>
+            <div class="package-grid">
+                <div class="package" onclick="selectPackage(100, 50, this)">
+                    <div class="package-credits">100</div>
+                    <div class="package-price">৳50</div>
+                    <div style="font-size: 12px; color: var(--primary);">Popular</div>
+                </div>
+                <div class="package" onclick="selectPackage(250, 100, this)">
+                    <div class="package-credits">250</div>
+                    <div class="package-price">৳100</div>
+                    <div style="font-size: 12px; color: var(--primary);">Value</div>
+                </div>
+                <div class="package" onclick="selectPackage(500, 180, this)">
+                    <div class="package-credits">500</div>
+                    <div class="package-price">৳180</div>
+                    <div style="font-size: 12px; color: var(--primary);">Best</div>
+                </div>
+                <div class="package" onclick="selectPackage(1000, 300, this)">
+                    <div class="package-credits">1000</div>
+                    <div class="package-price">৳300</div>
+                    <div style="font-size: 12px; color: var(--primary);">Pro</div>
+                </div>
+            </div>
+            <input type="text" class="transaction-input" id="txId" placeholder="Transaction ID" oninput="validatePayment()">
+            <button class="submit-payment-btn" id="payBtn" onclick="submitPayment()" disabled>
+                Submit Request
+            </button>
+        </div>
+    </div>
+
+    <!-- Upload Modal -->
+    <div class="modal-overlay" id="uploadModal">
+        <div class="modal-sheet">
+            <div class="modal-header">
+                <h3 class="modal-title">Send File</h3>
+                <button class="modal-close" onclick="closeModal('uploadModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="upload-options">
+                <div class="upload-option" onclick="openCamera()">
+                    <i class="fas fa-camera"></i>
+                    <span>Camera</span>
+                </div>
+                <div class="upload-option" onclick="openGallery()">
+                    <i class="fas fa-images"></i>
+                    <span>Gallery</span>
+                </div>
+                <div class="upload-option" onclick="openDocument()">
+                    <i class="fas fa-file-alt"></i>
+                    <span>Document</span>
+                </div>
+                <div class="upload-option" onclick="openAudio()">
+                    <i class="fas fa-music"></i>
+                    <span>Audio</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Modal -->
+    <div class="modal-overlay" id="historyModal">
+        <div class="modal-sheet">
+            <div class="modal-header">
+                <h3 class="modal-title">Chat History</h3>
+                <button class="modal-close" onclick="closeModal('historyModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="history-list" id="historyList">
+                <div class="empty-state">No chat history yet</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-overlay" id="settingsModal">
+        <div class="modal-sheet">
+            <div class="modal-header">
+                <h3 class="modal-title">Settings</h3>
+                <button class="modal-close" onclick="closeModal('settingsModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="settings-section">
+                <div class="settings-label">Theme Color</div>
+                <div class="theme-options">
+                    <div class="theme-option active" data-color="pink" onclick="setTheme('pink')">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <div class="theme-option" data-color="blue" onclick="setTheme('blue')">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <div class="theme-option" data-color="green" onclick="setTheme('green')">
+                        <i class="fas fa-check"></i>
+                    </div>
+                    <div class="theme-option" data-color="purple" onclick="setTheme('purple')">
+                        <i class="fas fa-check"></i>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-section">
+                <div class="settings-label">Language Preference</div>
+                <div class="nav-item" onclick="setLanguage('auto')" style="background: var(--bg-dark-card); margin-bottom: 8px;">
+                    <i class="fas fa-globe"></i>
+                    <span>Auto Detect (Default)</span>
+                </div>
+                <div class="nav-item" onclick="setLanguage('bn')" style="background: var(--bg-dark-card); margin-bottom: 8px;">
+                    <i class="fas fa-language"></i>
+                    <span>Always বাংলা</span>
+                </div>
+                <div class="nav-item" onclick="setLanguage('en')" style="background: var(--bg-dark-card);">
+                    <i class="fas fa-language"></i>
+                    <span>Always English</span>
+                </div>
+            </div>
+            <div class="settings-section">
+                <div class="settings-label">Features</div>
+                <div class="nav-item" style="background: var(--bg-dark-card); margin-bottom: 8px;">
+                    <i class="fas fa-search"></i>
+                    <span>Web Search</span>
+                    <span class="nav-badge" style="background: #22c55e;">ON</span>
+                </div>
+                <div class="nav-item" style="background: var(--bg-dark-card); margin-bottom: 8px;">
+                    <i class="fas fa-image"></i>
+                    <span>Image Generation</span>
+                    <span class="nav-badge" style="background: #22c55e;">ON</span>
+                </div>
+                <div class="nav-item" style="background: var(--bg-dark-card);">
+                    <i class="fas fa-brain"></i>
+                    <span>Memory</span>
+                    <span class="nav-badge" style="background: #22c55e;">ON</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Memory Modal -->
+    <div class="modal-overlay" id="memoryModal">
+        <div class="modal-sheet">
+            <div class="modal-header">
+                <h3 class="modal-title">Persistent Memory</h3>
+                <button class="modal-close" onclick="closeModal('memoryModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="memory-panel" id="memoryPanel">
+                <div class="empty-state">No memories stored yet. AI will remember your preferences across conversations.</div>
+            </div>
+            <button class="submit-payment-btn" onclick="clearMemory()">
+                <i class="fas fa-trash"></i> Clear All Memories
+            </button>
+        </div>
+    </div>
+
+    <!-- Canvas Modal -->
+    <div class="modal-overlay" id="canvasModal">
+        <div class="modal-sheet" style="max-height: 95vh;">
+            <div class="modal-header">
+                <h3 class="modal-title">Canvas Mode</h3>
+                <button class="modal-close" onclick="closeModal('canvasModal')">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="canvas-container">
+                <div class="canvas-header">
+                    <div class="canvas-tabs">
+                        <button class="canvas-tab active" onclick="switchCanvasTab('write')">Write</button>
+                        <button class="canvas-tab" onclick="switchCanvasTab('code')">Code</button>
+                    </div>
+                    <button class="copy-btn" onclick="copyCanvasContent()">
+                        <i class="fas fa-copy"></i> Copy
+                    </button>
+                </div>
+                <div class="canvas-content">
+                    <textarea class="canvas-editor" id="canvasEditor" placeholder="Start writing or coding here... AI will help you refine it."></textarea>
+                </div>
+            </div>
+            <button class="submit-payment-btn" onclick="askAIAboutCanvas()" style="margin-top: 12px;">
+                <i class="fas fa-robot"></i> Ask AI to Improve
+            </button>
+        </div>
+    </div>
+
+    <!-- Developer Modal -->
+    <div class="modal-overlay" id="developerModal">
+        <div class="modal-sheet" style="background: var(--bg-dark); padding: 0; max-height: 100vh;">
+            <div class="developer-screen">
+                <div class="modal-header" style="width: 100%; padding: 20px 0;">
+                    <h3 class="modal-title">Developer</h3>
+                    <button class="modal-close" onclick="closeModal('developerModal')" style="position: absolute; right: 20px; top: 20px;">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div class="developer-avatar">ME</div>
+                <div class="developer-name">Mujahid Ehsan</div>
+                <div class="developer-role">Student Developer • Bangladesh 🇧🇩</div>
+                <div class="developer-info-card">
+                    <div class="developer-info-item">
+                        <div class="info-icon">
+                            <i class="fas fa-envelope"></i>
+                        </div>
+                        <div class="info-content">
+                            <div class="info-label">Email</div>
+                            <div class="info-value">ehsanrahman1959@gmail.com</div>
+                        </div>
+                    </div>
+                    <div class="developer-info-item">
+                        <div class="info-icon">
+                            <i class="fas fa-code"></i>
+                        </div>
+                        <div class="info-content">
+                            <div class="info-label">Version</div>
+                            <div class="info-value">MRE AI v4.0 Premium</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ==========================================
+        // SECURE CONFIGURATION
+        // ==========================================
+        const CONFIG = {
+            API_KEY: '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',
+            API_URL: 'https://openrouter.ai/api/v1/chat/completions',
+            MODEL: 'arcee-ai/trinity-large-preview:free',
+            RATE_LIMIT: {
+                maxRequests: 10,
+                windowMs: 60000
+            }
+        };
+
+        // Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyAlDVJC4nAVw99qMTnL0WodeIxK1IwTyrE",
+            authDomain: "mre-ai.firebaseapp.com",
+            projectId: "mre-ai",
+            storageBucket: "mre-ai.appspot.com",
+            messagingSenderId: "1086919837285",
+            appId: "1:1086919837285:web:f8ba015cf7246b3951688c"
+        };
+
+        // Initialize Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        // ==========================================
+        // GLOBAL STATE
+        // ==========================================
+        let currentUser = null;
+        let userCredits = 40;
+        let conversationHistory = [];
+        let currentChatId = null;
+        let isTyping = false;
+        let isGenerating = false;
+        let abortController = null;
+        let selectedFile = null;
+        let languagePreference = 'auto';
+        let currentTheme = 'pink';
+        let recognition = null;
+        let chatHistory = [];
+        let isGoogleSigningIn = false;
+        let currentAIMessageId = null;
+        let streamingTimeout = null;
+        let requestQueue = [];
+        let lastRequestTime = 0;
+        let useSimpleQuery = false;
+        let selectedPackage = null;
+        let persistentMemory = {};
+        let googleProvider = null;
+
+        // ==========================================
+        // INITIALIZATION - CHECK REDIRECT FIRST
+        // ==========================================
+        
+        // CRITICAL: Check redirect result IMMEDIATELY before anything else
+        (async function initAuth() {
+            try {
+                // Show loading state if we're processing a redirect
+                const pendingRedirect = sessionStorage.getItem('pendingGoogleRedirect');
+                if (pendingRedirect) {
+                    showRedirectStatus(true);
+                }
+
+                const result = await auth.getRedirectResult();
+                
+                // Clear pending flag
+                sessionStorage.removeItem('pendingGoogleRedirect');
+                showRedirectStatus(false);
+                
+                if (result && result.user) {
+                    console.log('Redirect login successful:', result.user.email);
+                    await handleGoogleSuccess(result.user);
+                }
+            } catch (error) {
+                console.error('Redirect result error:', error);
+                sessionStorage.removeItem('pendingGoogleRedirect');
+                showRedirectStatus(false);
+                
+                // Only show error if it's not a null user error
+                if (error.code !== 'auth/null-user') {
+                    showToast('Login failed: ' + error.message, 'error');
+                }
+            }
+        })();
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initTheme();
+            initVoiceRecognition();
+            setupEventListeners();
+            checkOnlineStatus();
+            initGoogleProvider();
+
+            setTimeout(() => {
+                const loader = document.getElementById('loadingScreen');
+                loader.style.opacity = '0';
+                setTimeout(() => {
+                    loader.classList.add('hide');
+                }, 500);
+            }, 2000);
+        });
+
+        function showRedirectStatus(show) {
+            const statusDiv = document.getElementById('redirectStatus');
+            const btn = document.getElementById('googleSignInBtn');
+            if (statusDiv) {
+                statusDiv.style.display = show ? 'block' : 'none';
+            }
+            if (btn) {
+                btn.disabled = show;
+                if (show) {
+                    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Redirecting...';
+                } else {
+                    btn.innerHTML = '<i class="fab fa-google"></i> <span id="googleBtnText">Continue with Google</span>';
+                }
+            }
+        }
+
+        function initGoogleProvider() {
+            googleProvider = new firebase.auth.GoogleAuthProvider();
+            googleProvider.addScope('https://www.googleapis.com/auth/userinfo.profile');
+            googleProvider.addScope('https://www.googleapis.com/auth/userinfo.email');
+            // Force account selection every time to avoid silent failures
+            googleProvider.setCustomParameters({
+                prompt: 'select_account'
+            });
+        }
+
+        // ==========================================
+        // THEME MANAGEMENT
+        // ==========================================
+        function initTheme() {
+            const savedColor = localStorage.getItem('themeColor') || 'pink';
+            const savedLang = localStorage.getItem('language') || 'auto';
+            const savedMemory = localStorage.getItem('persistentMemory');
+            
+            setTheme(savedColor);
+            languagePreference = savedLang;
+            
+            if (savedMemory) {
+                try {
+                    persistentMemory = JSON.parse(savedMemory);
+                } catch (e) {
+                    persistentMemory = {};
+                }
+            }
+        }
+
+        function setTheme(color) {
+            document.documentElement.setAttribute('data-theme', color);
+            currentTheme = color;
+            localStorage.setItem('themeColor', color);
+            document.querySelectorAll('.theme-option').forEach(el => {
+                el.classList.toggle('active', el.dataset.color === color);
+            });
+        }
+
+        // ==========================================
+        // UTILITY FUNCTIONS
+        // ==========================================
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            const icons = { success: 'check-circle', error: 'exclamation-circle', info: 'info-circle' };
+            toast.innerHTML = `
+                <div class="toast-icon"><i class="fas fa-${icons[type]}"></i></div>
+                <div class="toast-content">
+                    <h4>${type.charAt(0).toUpperCase() + type.slice(1)}</h4>
+                    <p>${escapeHtml(message)}</p>
+                </div>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                toast.style.transform = 'translateY(-20px)';
+                setTimeout(() => toast.remove(), 300);
+            }, 3000);
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        function checkOnlineStatus() {
+            window.addEventListener('online', () => showToast('Back online!', 'success'));
+            window.addEventListener('offline', () => showToast('You are offline', 'error'));
+        }
+
+        // ==========================================
+        // RATE LIMITING
+        // ==========================================
+        function checkRateLimit() {
+            const now = Date.now();
+            requestQueue = requestQueue.filter(time => now - time < CONFIG.RATE_LIMIT.windowMs);
+            
+            if (requestQueue.length >= CONFIG.RATE_LIMIT.maxRequests) {
+                showToast('Too many requests. Please wait a moment.', 'error');
+                return false;
+            }
+            
+            requestQueue.push(now);
+            return true;
+        }
+
+        // ==========================================
+        // AUTHENTICATION - FIXED GOOGLE SIGN-IN
+        // ==========================================
+        function switchTab(tab) {
+            document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.auth-form').forEach(f => f.classList.add('hide'));
+            if (tab === 'signup') {
+                document.querySelectorAll('.auth-tab')[0].classList.add('active');
+                document.getElementById('signupForm').classList.remove('hide');
+            } else {
+                document.querySelectorAll('.auth-tab')[1].classList.add('active');
+                document.getElementById('loginForm').classList.remove('hide');
+            }
+        }
+
+        async function handleSignup(e) {
+            e.preventDefault();
+            if (!navigator.onLine) {
+                showToast('No internet connection', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('signupBtn');
+            try {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+                const name = document.getElementById('signupName').value.trim();
+                const email = document.getElementById('signupEmail').value.trim();
+                const password = document.getElementById('signupPassword').value;
+
+                const result = await auth.createUserWithEmailAndPassword(email, password);
+                await result.user.updateProfile({ displayName: name });
+
+                await db.collection('users').doc(result.user.uid).set({
+                    name, email, credits: 40,
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                    lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                showToast('Account created successfully!', 'success');
+            } catch (error) {
+                showToast(getErrorMessage(error.code), 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-user-plus"></i> Create Account';
+            }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            if (!navigator.onLine) {
+                showToast('No internet connection', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('loginBtn');
+            try {
+                btn.disabled = true;
+                btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Signing in...';
+                await auth.signInWithEmailAndPassword(
+                    document.getElementById('loginEmail').value.trim(),
+                    document.getElementById('loginPassword').value
+                );
+            } catch (error) {
+                showToast(getErrorMessage(error.code), 'error');
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fas fa-sign-in-alt"></i> Sign In';
+            }
+        }
+
+        // FIXED: Use redirect-only approach for reliability
+        async function handleGoogleSignIn() {
+            if (isGoogleSigningIn) return;
+            if (!navigator.onLine) {
+                showToast('No internet connection', 'error');
+                return;
+            }
+
+            // Check if in WebView (Instagram, Facebook in-app browser)
+            const isInWebView = /(iPhone|iPod|iPad).*AppleWebKit(?!.*Safari)/i.test(navigator.userAgent) || 
+                               window.self !== window.top ||
+                               /FBAN|FBAV|Instagram|Twitter/i.test(navigator.userAgent);
+
+            if (isInWebView) {
+                showToast('Please open in Safari/Chrome browser for Google Sign In', 'error');
+                // Optionally provide a link to open in external browser
+                setTimeout(() => {
+                    if (confirm('Open in external browser?')) {
+                        window.open(window.location.href, '_system');
+                    }
+                }, 1000);
+                return;
+            }
+
+            isGoogleSigningIn = true;
+            const btn = document.getElementById('googleSignInBtn');
+            btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Connecting...';
+            btn.disabled = true;
+
+            try {
+                // Store that we're attempting redirect
+                sessionStorage.setItem('pendingGoogleRedirect', 'true');
+                
+                // Use redirect instead of popup for better reliability
+                await auth.signInWithRedirect(googleProvider);
+                
+            } catch (error) {
+                console.error('Google Sign In Error:', error);
+                showToast(getErrorMessage(error.code), 'error');
+                sessionStorage.removeItem('pendingGoogleRedirect');
+                resetGoogleButton();
+            }
+        }
+
+        function resetGoogleButton() {
+            isGoogleSigningIn = false;
+            const btn = document.getElementById('googleSignInBtn');
+            if (btn) {
+                btn.innerHTML = '<i class="fab fa-google"></i> <span id="googleBtnText">Continue with Google</span>';
+                btn.disabled = false;
+            }
+        }
+
+        async function handleGoogleSuccess(user) {
+            try {
+                const userDoc = await db.collection('users').doc(user.uid).get();
+
+                if (!userDoc.exists) {
+                    await db.collection('users').doc(user.uid).set({
+                        name: user.displayName,
+                        email: user.email,
+                        photoURL: user.photoURL,
+                        credits: 40,
+                        createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+                        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    showToast('Welcome to MRE AI!', 'success');
+                } else {
+                    await db.collection('users').doc(user.uid).update({
+                        lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+                    });
+                    showToast('Welcome back!', 'success');
+                }
+            } catch (error) {
+                console.error('Error saving user data:', error);
+                showToast('Signed in but failed to save data', 'warning');
+            } finally {
+                resetGoogleButton();
+            }
+        }
+
+        function getErrorMessage(code) {
+            const errors = {
+                'auth/email-already-in-use': 'Email already registered',
+                'auth/invalid-email': 'Invalid email address',
+                'auth/weak-password': 'Password too weak (min 6 chars)',
+                'auth/user-not-found': 'Account not found',
+                'auth/wrong-password': 'Wrong password',
+                'auth/popup-blocked': 'Popup blocked! Please allow popups',
+                'auth/popup-closed-by-user': 'Sign in cancelled. Please try again.',
+                'auth/cancelled-popup-request': 'Another sign in in progress',
+                'auth/account-exists-with-different-credential': 'Account exists with different method',
+                'auth/unauthorized-domain': 'Domain not authorized in Firebase',
+                'auth/operation-not-allowed': 'Google sign in not enabled in Firebase',
+                'auth/network-request-failed': 'Network error. Check your connection',
+                'auth/too-many-requests': 'Too many attempts. Try again later',
+                'auth/redirect-cancelled-by-user': 'Sign in cancelled',
+                'auth/redirect-storage-unauthorized': 'Browser storage blocked. Please enable cookies.'
+            };
+            return errors[code] || `Error: ${code}`;
+        }
+
+        // Auth State Listener
+        auth.onAuthStateChanged(async (user) => {
+            if (user) {
+                currentUser = user;
+                try {
+                    const userDoc = await db.collection('users').doc(user.uid).get();
+                    if (userDoc.exists) {
+                        userCredits = userDoc.data().credits || 40;
+                        // Load memory from Firestore
+                        if (userDoc.data().memory) {
+                            persistentMemory = userDoc.data().memory;
+                            localStorage.setItem('persistentMemory', JSON.stringify(persistentMemory));
+                        }
+                        updateUserUI(user);
+                    }
+                    document.getElementById('authContainer').classList.remove('active');
+                    document.getElementById('appLayout').classList.add('active');
+
+                    const firstName = (user.displayName || 'there').split(' ')[0];
+                    document.getElementById('userFirstName').textContent = firstName;
+
+                    loadChatHistorySimple();
+                } catch (error) {
+                    console.error('Error loading user data:', error);
+                    showToast('Error loading user data', 'error');
+                }
+            } else {
+                document.getElementById('authContainer').classList.add('active');
+                document.getElementById('appLayout').classList.remove('active');
+            }
+        });
+
+        function updateUserUI(user) {
+            const avatarContainer = document.getElementById('sidebarAvatar');
+            if (user.photoURL) {
+                avatarContainer.innerHTML = `<img src="${escapeHtml(user.photoURL)}" alt="Profile" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\'avatar-initial\'>${(user.displayName || user.email || 'U').charAt(0).toUpperCase()}</div>';">`;
+            } else {
+                const initial = (user.displayName || user.email || 'U').charAt(0).toUpperCase();
+                avatarContainer.innerHTML = `<div class="avatar-initial">${escapeHtml(initial)}</div>`;
+            }
+
+            document.getElementById('sidebarName').textContent = user.displayName || user.email.split('@')[0];
+            document.getElementById('sidebarEmail').textContent = user.email;
+            document.getElementById('statCredits').textContent = userCredits;
+            document.getElementById('creditDisplay').textContent = userCredits;
+        }
+
+        // ==========================================
+        // SIDEBAR & NAVIGATION
+        // ==========================================
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            sidebar.classList.toggle('active');
+            overlay.classList.toggle('active');
+        }
+
+        // ==========================================
+        // CHAT FUNCTIONS
+        // ==========================================
+        function newChat() {
+            stopGeneration();
+            stopVoiceRecording();
+
+            conversationHistory = [];
+            currentChatId = null;
+            
+            const container = document.getElementById('chatContainer');
+            container.innerHTML = `
+                <div class="welcome-screen-new" id="welcomeScreen">
+                    <div class="ai-avatar-large">
+                        <i class="fas fa-robot"></i>
+                    </div>
+                    <div class="welcome-text">
+                        Hi <strong>${escapeHtml(currentUser?.displayName?.split(' ')[0] || 'there')}</strong>, I'm MRE AI! I can understand বাংলা, English, and Banglish. Try asking me anything or upload an image.
+                    </div>
+                    <div class="suggestion-pills">
+                        <button class="suggestion-pill" onclick="quickAsk('Search for latest AI news')">
+                            <i class="fas fa-search"></i> Search for latest AI news
+                        </button>
+                        <button class="suggestion-pill" onclick="quickAsk('Generate an image of a futuristic city')">
+                            <i class="fas fa-image"></i> Generate an image of a futuristic city
+                        </button>
+                        <button class="suggestion-pill" onclick="quickAsk('Analyze this data and create a chart')">
+                            <i class="fas fa-chart-bar"></i> Analyze data and create chart
+                        </button>
+                        <button class="suggestion-pill" onclick="quickAsk('Explain quantum physics in simple terms')">
+                            Explain quantum physics in simple terms
+                        </button>
+                        <button class="suggestion-pill" onclick="quickAsk('Write a Python script to automate file organization')">
+                            Write a Python script to automate file organization
+                        </button>
+                        <button class="suggestion-pill" onclick="quickAsk('বাংলাদেশের ইতিহাস বলো')">
+                            বাংলাদেশের ইতিহাস বলো
+                        </button>
+                    </div>
+                    <div class="quick-chips">
+                        <button class="quick-chip" onclick="quickAsk('বাংলা')">
+                            <i class="fas fa-language"></i> বাংলা
+                        </button>
+                        <button class="quick-chip" onclick="quickAsk('English')">
+                            <i class="fas fa-globe"></i> English
+                        </button>
+                        <button class="quick-chip" onclick="quickAsk('Banglish')">
+                            <i class="fas fa-comments"></i> Banglish
+                        </button>
+                        <button class="quick-chip" onclick="quickAsk('Science')">
+                            <i class="fas fa-flask"></i> Science
+                        </button>
+                    </div>
+                </div>
+            `;
+            toggleSidebar();
+            updateInputState();
+        }
+
+        function quickAsk(text) {
+            if (isGenerating) {
+                showToast('Please stop current generation first', 'info');
+                return;
+            }
+            document.getElementById('messageInput').value = text;
+            autoResize(document.getElementById('messageInput'));
+            sendMessage();
+        }
+
+        function handleSendClick() {
+            if (isGenerating) {
+                stopGeneration();
+            } else {
+                sendMessage();
+            }
+        }
+
+        function stopGeneration() {
+            console.log('Stopping generation...');
+            
+            if (abortController) {
+                abortController.abort();
+                abortController = null;
+            }
+            
+            if (streamingTimeout) {
+                clearTimeout(streamingTimeout);
+                streamingTimeout = null;
+            }
+            
+            isGenerating = false;
+            hideTyping();
+            updateInputState();
+
+            if (currentAIMessageId) {
+                const contentDiv = document.querySelector(`[data-message-id="${currentAIMessageId}"] .message-content`);
+                if (contentDiv) {
+                    const fullText = contentDiv.dataset.fullText || '';
+                    if (fullText && fullText.trim()) {
+                        conversationHistory.push({ role: 'assistant', content: fullText });
+                        saveChat();
+                    }
+                }
+                currentAIMessageId = null;
+            }
+        }
+
+        function stopVoiceRecording() {
+            if (recognition && document.getElementById('voiceBtn').classList.contains('recording')) {
+                recognition.stop();
+                document.getElementById('voiceBtn').classList.remove('recording');
+                document.getElementById('voiceBtn').innerHTML = '<i class="fas fa-microphone"></i>';
+            }
+        }
+
+        function updateInputState() {
+            const input = document.getElementById('messageInput');
+            const sendBtn = document.getElementById('sendBtn');
+            const uploadBtn = document.getElementById('uploadBtn');
+            const voiceBtn = document.getElementById('voiceBtn');
+            const inputWrapper = document.getElementById('inputWrapper');
+
+            if (isGenerating) {
+                input.disabled = true;
+                input.placeholder = "AI is responding...";
+                sendBtn.innerHTML = '<i class="fas fa-stop"></i>';
+                sendBtn.classList.add('stop-mode');
+                uploadBtn.style.display = 'none';
+                voiceBtn.style.display = 'none';
+                inputWrapper.classList.add('disabled');
+            } else {
+                input.disabled = false;
+                input.placeholder = "Ask away. Pics work too";
+                sendBtn.innerHTML = '<i class="fas fa-paper-plane"></i>';
+                sendBtn.classList.remove('stop-mode');
+                uploadBtn.style.display = 'flex';
+                voiceBtn.style.display = 'flex';
+                inputWrapper.classList.remove('disabled');
+                input.focus();
+            }
+        }
+
+        async function sendMessage() {
+            if (!navigator.onLine) {
+                showToast('No internet connection', 'error');
+                return;
+            }
+
+            const input = document.getElementById('messageInput');
+            const text = input.value.trim();
+
+            if (!text) return;
+            
+            if (userCredits <= 0) {
+                showToast('Please buy more credits', 'error');
+                openCreditsModal();
+                return;
+            }
+            
+            if (isGenerating) {
+                showToast('Please wait for current response', 'info');
+                return;
+            }
+
+            if (!checkRateLimit()) {
+                return;
+            }
+
+            stopVoiceRecording();
+
+            const welcome = document.getElementById('welcomeScreen');
+            if (welcome) welcome.remove();
+
+            const messageId = Date.now().toString();
+            const messageData = {
+                role: 'user',
+                content: text,
+                timestamp: new Date(),
+                id: messageId
+            };
+
+            displayMessage(messageData);
+            conversationHistory.push({ role: 'user', content: text });
+
+            // Extract memory from user message
+            extractMemory(text);
+
+            input.value = '';
+            input.style.height = 'auto';
+
+            userCredits--;
+            updateCredits();
+
+            isGenerating = true;
+            updateInputState();
+            showTyping();
+
+            try {
+                await getAIResponseStreaming(text);
+            } catch (error) {
+                console.error('Error:', error);
+                hideTyping();
+                
+                userCredits++;
+                updateCredits();
+                
+                if (error.name === 'AbortError') {
+                    showToast('Generation stopped', 'info');
+                } else {
+                    showToast('Failed to get response: ' + error.message, 'error');
+                }
+            } finally {
+                isGenerating = false;
+                updateInputState();
+            }
+        }
+
+        function detectLanguage(text) {
+            const bengaliRegex = /[\u0980-\u09FF]/;
+            if (bengaliRegex.test(text)) return 'bn';
+
+            const banglishWords = ['ki', 'kemon', 'kothay', 'kivabe', 'keno', 'kokhon', 'amar', 'tumar', 'apnar'];
+            const lowerText = text.toLowerCase();
+            if (banglishWords.some(word => lowerText.includes(word))) return 'banglish';
+
+            return 'en';
+        }
+
+        // ==========================================
+        // PERSISTENT MEMORY
+        // ==========================================
+        function extractMemory(text) {
+            const memoryPatterns = [
+                { pattern: /my name is (\w+)/i, key: 'name' },
+                { pattern: /i am (\d+) years old/i, key: 'age' },
+                { pattern: /i like (\w+)/i, key: 'likes' },
+                { pattern: /i work as (\w+)/i, key: 'occupation' },
+                { pattern: /i live in (\w+)/i, key: 'location' }
+            ];
+
+            memoryPatterns.forEach(({ pattern, key }) => {
+                const match = text.match(pattern);
+                if (match) {
+                    persistentMemory[key] = match[1];
+                    saveMemory();
+                    showToast(`Remembered: ${key} = ${match[1]}`, 'success');
+                }
+            });
+        }
+
+        function saveMemory() {
+            localStorage.setItem('persistentMemory', JSON.stringify(persistentMemory));
+            if (currentUser) {
+                db.collection('users').doc(currentUser.uid).update({
+                    memory: persistentMemory
+                }).catch(err => console.error('Error saving memory:', err));
+            }
+        }
+
+        function getMemoryContext() {
+            if (Object.keys(persistentMemory).length === 0) return '';
+            
+            let context = 'User preferences: ';
+            Object.entries(persistentMemory).forEach(([key, value]) => {
+                context += `${key} is ${value}. `;
+            });
+            return context;
+        }
+
+        // ==========================================
+        // AI RESPONSE WITH STREAMING - KIMI STYLE
+        // ==========================================
+        async function getAIResponseStreaming(userMessage) {
+            const lang = detectLanguage(userMessage);
+            let systemPrompt = 'You are MRE AI, a helpful assistant with advanced capabilities including web search, image generation, and data analysis. ';
+            
+            const memoryContext = getMemoryContext();
+            if (memoryContext) {
+                systemPrompt += memoryContext + ' ';
+            }
+
+            if (languagePreference === 'auto') {
+                if (lang === 'bn' || lang === 'banglish') {
+                    systemPrompt += 'Respond in Bengali (বাংলা). ';
+                } else {
+                    systemPrompt += 'Respond in English. ';
+                }
+            } else if (languagePreference === 'bn') {
+                systemPrompt += 'Respond in Bengali (বাংলা). ';
+            } else {
+                systemPrompt += 'Respond in English. ';
+            }
+
+            abortController = new AbortController();
+
+            try {
+                const response = await fetch(CONFIG.API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${CONFIG.API_KEY}`,
+                        'HTTP-Referer': window.location.origin,
+                        'X-Title': 'MRE AI'
+                    },
+                    body: JSON.stringify({
+                        model: CONFIG.MODEL,
+                        messages: [
+                            { role: 'system', content: systemPrompt },
+                            ...conversationHistory.slice(-20)
+                        ]
+                    }),
+                    signal: abortController.signal
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error?.message || `API Error: ${response.status}`);
+                }
+
+                const data = await response.json();
+                const fullText = data.choices[0].message.content;
+
+                hideTyping();
+                await streamMessageKimiStyle(fullText);
+
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    console.log('Generation stopped by user');
+                    throw error;
+                } else {
+                    throw error;
+                }
+            }
+        }
+
+        async function streamMessageKimiStyle(fullText) {
+            const messageId = 'ai-' + Date.now();
+            currentAIMessageId = messageId;
+
+            const container = document.getElementById('chatContainer');
+
+            const messageHtml = `
+                <div class="message ai" data-message-id="${messageId}">
+                    <div class="message-wrapper">
+                        <div class="message-avatar">
+                            <i class="fas fa-robot"></i>
+                        </div>
+                        <div class="message-content" data-full-text="">
+                            <span class="streaming-text"></span>
+                        </div>
+                    </div>
+                    <div class="message-actions">
+                        <button class="message-action-btn" onclick="copyMessage('${messageId}')">
+                            <i class="fas fa-copy"></i> Copy
+                        </button>
+                        <button class="message-action-btn" onclick="regenerateMessage('${messageId}')">
+                            <i class="fas fa-redo"></i> Retry
+                        </button>
+                        <button class="message-action-btn" onclick="deleteMessage('${messageId}')">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+            `;
+
+            container.insertAdjacentHTML('beforeend', messageHtml);
+
+            const textSpan = container.querySelector(`[data-message-id="${messageId}"] .streaming-text`);
+            const contentDiv = container.querySelector(`[data-message-id="${messageId}"] .message-content`);
+
+            let index = 0;
+            const chars = fullText.split('');
+            const totalChars = chars.length;
+            
+            function getCharDelay(char) {
+                if ('.!?।'.includes(char)) return 80;
+                if (',;:\n'.includes(char)) return 40;
+                return 8;
+            }
+
+            return new Promise((resolve, reject) => {
+                function streamNext() {
+                    if (!isGenerating) {
+                        const partialText = fullText.substring(0, index);
+                        contentDiv.dataset.fullText = partialText;
+                        contentDiv.innerHTML = formatMessage(partialText);
+                        contentDiv.querySelectorAll('pre code').forEach((block) => {
+                            hljs.highlightElement(block);
+                        });
+                        
+                        reject(new Error('Generation stopped by user'));
+                        return;
+                    }
+
+                    if (index >= totalChars) {
+                        contentDiv.dataset.fullText = fullText;
+                        contentDiv.innerHTML = formatMessage(fullText);
+                        contentDiv.querySelectorAll('pre code').forEach((block) => {
+                            hljs.highlightElement(block);
+                        });
+
+                        conversationHistory.push({ role: 'assistant', content: fullText });
+                        saveChat();
+                        currentAIMessageId = null;
+                        resolve();
+                        return;
+                    }
+
+                    const char = chars[index];
+                    const span = document.createElement('span');
+                    span.className = 'streaming-char';
+                    span.style.animationDelay = '0ms';
+                    span.textContent = char;
+                    textSpan.appendChild(span);
+
+                    index++;
+
+                    if (container.scrollHeight - container.scrollTop - container.clientHeight < 200) {
+                        container.scrollTop = container.scrollHeight;
+                    }
+
+                    const delay = getCharDelay(char);
+                    streamingTimeout = setTimeout(streamNext, delay);
+                }
+
+                streamNext();
+            });
+        }
+
+        function displayMessage(data) {
+            const container = document.getElementById('chatContainer');
+            const isUser = data.role === 'user';
+            const messageId = data.id || Date.now().toString();
+
+            const messageHtml = `
+                <div class="message ${isUser ? 'user' : 'ai'}" data-message-id="${messageId}">
+                    <div class="message-wrapper">
+                        <div class="message-avatar">
+                            ${isUser 
+                                ? (currentUser?.photoURL ? `<img src="${escapeHtml(currentUser.photoURL)}" onerror="this.style.display='none'; this.parentElement.innerHTML='<i class=\'fas fa-user\'></i>';">` : '<i class="fas fa-user"></i>')
+                                : '<i class="fas fa-robot"></i>'}
+                        </div>
+                        <div class="message-content" data-full-text="${escapeHtml(data.content)}">
+                            ${isUser ? escapeHtml(data.content) : formatMessage(data.content)}
+                        </div>
+                    </div>
+                    ${isUser ? `
+                    <div class="message-actions" style="justify-content: flex-end;">
+                        <button class="message-action-btn" onclick="editMessage('${messageId}')">
+                            <i class="fas fa-edit"></i> Edit
+                        </button>
+                        <button class="message-action-btn" onclick="deleteMessage('${messageId}')">
+                            <i class="fas fa-trash"></i> Delete
+                        </button>
+                    </div>
+                    ` : ''}
+                </div>
+            `;
+
+            container.insertAdjacentHTML('beforeend', messageHtml);
+            container.scrollTop = container.scrollHeight;
+
+            if (!isUser) {
+                const msgElement = container.querySelector(`[data-message-id="${messageId}"]`);
+                if (msgElement) {
+                    msgElement.querySelectorAll('pre code').forEach((block) => {
+                        hljs.highlightElement(block);
+                    });
+                }
+            }
+        }
+
+        function editMessage(messageId) {
+            const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+            if (!messageEl) return;
+            
+            const contentDiv = messageEl.querySelector('.message-content');
+            const currentText = contentDiv.dataset.fullText || contentDiv.textContent;
+            
+            contentDiv.classList.add('editing');
+            contentDiv.innerHTML = `
+                <textarea class="edit-textarea" rows="3">${escapeHtml(currentText)}</textarea>
+                <div class="edit-actions">
+                    <button class="edit-btn cancel" onclick="cancelEdit('${messageId}')">Cancel</button>
+                    <button class="edit-btn save" onclick="saveEdit('${messageId}')">Save</button>
+                </div>
+            `;
+
+            const textarea = contentDiv.querySelector('.edit-textarea');
+            textarea.focus();
+            textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+            
+            textarea.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') {
+                    cancelEdit(messageId);
+                }
+            });
+        }
+
+        function cancelEdit(messageId) {
+            const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+            if (!messageEl) return;
+            
+            const contentDiv = messageEl.querySelector('.message-content');
+            const originalText = contentDiv.dataset.fullText || '';
+            const isUser = messageEl.classList.contains('user');
+
+            contentDiv.classList.remove('editing');
+            contentDiv.innerHTML = isUser ? escapeHtml(originalText) : formatMessage(originalText);
+
+            if (!isUser) {
+                contentDiv.querySelectorAll('pre code').forEach((block) => {
+                    hljs.highlightElement(block);
+                });
+            }
+        }
+
+        function saveEdit(messageId) {
+            const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+            if (!messageEl) return;
+            
+            const contentDiv = messageEl.querySelector('.message-content');
+            const textarea = contentDiv.querySelector('.edit-textarea');
+            const newText = textarea.value.trim();
+
+            if (!newText) {
+                cancelEdit(messageId);
+                showToast('Cannot save empty message', 'error');
+                return;
+            }
+
+            const isUser = messageEl.classList.contains('user');
+            contentDiv.classList.remove('editing');
+            contentDiv.dataset.fullText = newText;
+            contentDiv.innerHTML = isUser ? escapeHtml(newText) : formatMessage(newText);
+
+            for (let i = conversationHistory.length - 1; i >= 0; i--) {
+                if (conversationHistory[i].role === (isUser ? 'user' : 'assistant')) {
+                    conversationHistory[i].content = newText;
+                    break;
+                }
+            }
+
+            if (!isUser) {
+                contentDiv.querySelectorAll('pre code').forEach((block) => {
+                    hljs.highlightElement(block);
+                });
+            }
+
+            showToast('Message updated', 'success');
+            saveChat();
+        }
+
+        function deleteMessage(messageId) {
+            if (!confirm('Delete this message?')) return;
+            
+            const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+            if (!messageEl) return;
+            
+            const index = conversationHistory.findIndex(m => m.id === messageId || messageId.includes('ai-') || messageId.includes('hist-'));
+            if (index > -1) {
+                conversationHistory.splice(index, 1);
+            }
+            
+            messageEl.remove();
+            saveChat();
+            showToast('Message deleted', 'success');
+        }
+
+        function copyMessage(messageId) {
+            const messageEl = document.querySelector(`[data-message-id="${messageId}"]`);
+            if (!messageEl) return;
+            
+            const contentDiv = messageEl.querySelector('.message-content');
+            const text = contentDiv.dataset.fullText || contentDiv.textContent;
+
+            navigator.clipboard.writeText(text).then(() => {
+                showToast('Copied to clipboard', 'success');
+            }).catch(() => {
+                showToast('Failed to copy', 'error');
+            });
+        }
+
+        function regenerateMessage(messageId) {
+            deleteMessage(messageId);
+            const lastUserMsg = conversationHistory.filter(m => m.role === 'user').pop();
+            if (lastUserMsg) {
+                document.getElementById('messageInput').value = lastUserMsg.content;
+                sendMessage();
+            }
+        }
+
+        function formatMessage(text) {
+            if (!text) return '';
+
+            let formatted = escapeHtml(text);
+
+            // Code blocks
+            formatted = formatted.replace(/```([\w]*)\n?([\s\S]*?)```/g, function(match, lang, code) {
+                const cleanCode = escapeHtml(code.trim());
+                return `<div class="code-block">
+                    <div class="code-header">
+                        <span>${escapeHtml(lang || 'code')}</span>
+                        <button class="copy-btn" onclick="copyCode(this)">Copy</button>
+                    </div>
+                    <pre><code class="language-${escapeHtml(lang || 'plaintext')}">${cleanCode}</code></pre>
+                </div>`;
+            });
+
+            // Inline code
+            formatted = formatted.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+
+            // Bold
+            formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+            // Italic
+            formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
+
+            // Line breaks
+            formatted = formatted.replace(/\n/g, '<br>');
+
+            return DOMPurify.sanitize(formatted, { 
+                ALLOWED_TAGS: ['div', 'span', 'pre', 'code', 'strong', 'em', 'br', 'button', 'i'],
+                ALLOWED_ATTR: ['class', 'style', 'onclick', 'data-full-text']
+            });
+        }
+
+        function copyCode(btn) {
+            if (!btn) return;
+            
+            const codeBlock = btn.closest('.code-block');
+            if (!codeBlock) return;
+            
+            const codeElement = codeBlock.querySelector('code');
+            if (!codeElement) return;
+            
+            const code = codeElement.textContent;
+            
+            navigator.clipboard.writeText(code).then(() => {
+                btn.textContent = 'Copied!';
+                setTimeout(() => btn.textContent = 'Copy', 2000);
+            }).catch(() => {
+                showToast('Failed to copy code', 'error');
+            });
+        }
+
+        function showTyping() {
+            const container = document.getElementById('chatContainer');
+            if (document.getElementById('typingIndicator')) return;
+            
+            const typingHtml = `
+                <div class="typing-indicator" id="typingIndicator">
+                    <div class="message-wrapper">
+                        <div class="message-avatar"><i class="fas fa-robot"></i></div>
+                        <div class="typing-bubble">
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                            <div class="typing-dot"></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.insertAdjacentHTML('beforeend', typingHtml);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function hideTyping() {
+            const indicator = document.getElementById('typingIndicator');
+            if (indicator) indicator.remove();
+        }
+
+        // ==========================================
+        // FILE UPLOAD
+        // ==========================================
+        function openUploadModal() {
+            if (isGenerating) {
+                showToast('Please stop current generation first', 'info');
+                return;
+            }
+            document.getElementById('uploadModal').classList.add('active');
+        }
+
+        function openCamera() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.capture = 'environment';
+            input.onchange = handleFileSelect;
+            input.click();
+            closeModal('uploadModal');
+        }
+
+        function openGallery() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/*';
+            input.onchange = handleFileSelect;
+            input.click();
+            closeModal('uploadModal');
+        }
+
+        function openDocument() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = '.pdf,.doc,.docx,.txt,.xlsx,.csv';
+            input.onchange = handleFileSelect;
+            input.click();
+            closeModal('uploadModal');
+        }
+
+        function openAudio() {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'audio/*';
+            input.onchange = handleFileSelect;
+            input.click();
+            closeModal('uploadModal');
+        }
+
+        function handleFileSelect(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            selectedFile = file;
+            showFilePreview(file);
+        }
+
+        function showFilePreview(file) {
+            const container = document.getElementById('filePreviewContainer');
+            const size = (file.size / 1024 / 1024).toFixed(2);
+            
+            container.innerHTML = `
+                <div class="file-preview">
+                    <i class="fas fa-file"></i>
+                    <div class="file-info">
+                        <div class="file-name">${escapeHtml(file.name)}</div>
+                        <div class="file-size">${size} MB</div>
+                    </div>
+                    <button class="remove-file" onclick="removeFile()">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+            container.classList.remove('hide');
+        }
+
+        function removeFile() {
+            selectedFile = null;
+            document.getElementById('filePreviewContainer').classList.add('hide');
+        }
+
+        // ==========================================
+        // VOICE INPUT
+        // ==========================================
+        function initVoiceRecognition() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = true;
+                recognition.lang = languagePreference === 'bn' ? 'bn-BD' : 'en-US';
+
+                recognition.onresult = (event) => {
+                    let finalTranscript = '';
+                    let interimTranscript = '';
+
+                    for (let i = event.resultIndex; i < event.results.length; i++) {
+                        const transcript = event.results[i][0].transcript;
+                        if (event.results[i].isFinal) {
+                            finalTranscript += transcript;
+                        } else {
+                            interimTranscript += transcript;
+                        }
+                    }
+
+                    const input = document.getElementById('messageInput');
+                    if (finalTranscript) {
+                        input.value = finalTranscript;
+                        autoResize(input);
+                        document.getElementById('voiceBtn').innerHTML = '<i class="fas fa-microphone"></i>';
+                        document.getElementById('voiceBtn').classList.remove('recording');
+                        
+                        setTimeout(() => sendMessage(), 500);
+                    }
+                };
+
+                recognition.onerror = (event) => {
+                    console.error('Speech recognition error:', event.error);
+                    document.getElementById('voiceBtn').innerHTML = '<i class="fas fa-microphone"></i>';
+                    document.getElementById('voiceBtn').classList.remove('recording');
+                    showToast('Voice recognition failed: ' + event.error, 'error');
+                };
+                
+                recognition.onend = () => {
+                    document.getElementById('voiceBtn').innerHTML = '<i class="fas fa-microphone"></i>';
+                    document.getElementById('voiceBtn').classList.remove('recording');
+                };
+            }
+        }
+
+        function toggleVoiceInput() {
+            if (isGenerating) {
+                showToast('Please stop current generation first', 'info');
+                return;
+            }
+
+            if (!recognition) {
+                showToast('Voice input not supported in this browser', 'error');
+                return;
+            }
+
+            const btn = document.getElementById('voiceBtn');
+            if (btn.classList.contains('recording')) {
+                recognition.stop();
+                btn.classList.remove('recording');
+                btn.innerHTML = '<i class="fas fa-microphone"></i>';
+            } else {
+                try {
+                    recognition.lang = languagePreference === 'bn' ? 'bn-BD' : 'en-US';
+                    recognition.start();
+                    btn.classList.add('recording');
+                    btn.innerHTML = '<div class="voice-wave"><div class="voice-bar"></div><div class="voice-bar"></div><div class="voice-bar"></div><div class="voice-bar"></div><div class="voice-bar"></div></div>';
+                    showToast('Listening... Speak now', 'info');
+                } catch (e) {
+                    showToast('Could not start voice recognition', 'error');
+                }
+            }
+        }
+
+        // ==========================================
+        // CREDITS & PAYMENT
+        // ==========================================
+        function openCreditsModal() {
+            document.getElementById('creditsModal').classList.add('active');
+            toggleSidebar();
+        }
+
+        function selectPackage(credits, price, element) {
+            document.querySelectorAll('.package').forEach(p => p.classList.remove('selected'));
+            element.classList.add('selected');
+            selectedPackage = { credits, price };
+            validatePayment();
+        }
+
+        function validatePayment() {
+            const txId = document.getElementById('txId').value.trim();
+            const isValidTxId = txId.length >= 5 && /^[a-zA-Z0-9]+$/.test(txId);
+            document.getElementById('payBtn').disabled = !(isValidTxId && selectedPackage);
+        }
+
+        async function submitPayment() {
+            if (!currentUser || !selectedPackage) return;
+            
+            const txId = document.getElementById('txId').value.trim();
+            
+            if (txId.length < 5 || !/^[a-zA-Z0-9]+$/.test(txId)) {
+                showToast('Invalid Transaction ID format', 'error');
+                return;
+            }
+
+            try {
+                const existing = await db.collection('credit_requests')
+                    .where('transactionId', '==', txId)
+                    .get();
+                    
+                if (!existing.empty) {
+                    showToast('This Transaction ID has already been used', 'error');
+                    return;
+                }
+
+                await db.collection('credit_requests').add({
+                    userId: currentUser.uid,
+                    userEmail: currentUser.email,
+                    userName: currentUser.displayName,
+                    credits: selectedPackage.credits,
+                    amount: selectedPackage.price,
+                    transactionId: txId,
+                    status: 'pending',
+                    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+                });
+
+                showToast('Request submitted! Credits will be added after verification.', 'success');
+                closeModal('creditsModal');
+                document.getElementById('txId').value = '';
+                selectedPackage = null;
+                document.querySelectorAll('.package').forEach(p => p.classList.remove('selected'));
+            } catch (error) {
+                console.error('Payment submission error:', error);
+                showToast('Failed to submit: ' + error.message, 'error');
+            }
+        }
+
+        function updateCredits() {
+            document.getElementById('creditDisplay').textContent = userCredits;
+            document.getElementById('statCredits').textContent = userCredits;
+            if (currentUser) {
+                db.collection('users').doc(currentUser.uid).update({ credits: userCredits })
+                    .catch(err => console.error('Error updating credits:', err));
+            }
+        }
+
+        // ==========================================
+        // CHAT HISTORY
+        // ==========================================
+        async function loadChatHistorySimple() {
+            if (!currentUser) return;
+
+            try {
+                let snapshot;
+                
+                if (!useSimpleQuery) {
+                    try {
+                        snapshot = await db.collection('chats')
+                            .where('userId', '==', currentUser.uid)
+                            .orderBy('updatedAt', 'desc')
+                            .limit(50)
+                            .get();
+                    } catch (indexError) {
+                        if (indexError.code === 'failed-precondition') {
+                            console.warn('Index not found, using fallback query');
+                            useSimpleQuery = true;
+                            showToast('Chat history loading in simple mode. Some features may be limited.', 'info');
+                            
+                            snapshot = await db.collection('chats')
+                                .where('userId', '==', currentUser.uid)
+                                .limit(100)
+                                .get();
+                        } else {
+                            throw indexError;
+                        }
+                    }
+                } else {
+                    snapshot = await db.collection('chats')
+                        .where('userId', '==', currentUser.uid)
+                        .limit(100)
+                        .get();
+                }
+
+                chatHistory = [];
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    chatHistory.push({ 
+                        id: doc.id, 
+                        ...data,
+                        sortTime: data.updatedAt || data.createdAt || { toDate: () => new Date(0) }
+                    });
+                });
+
+                if (useSimpleQuery) {
+                    chatHistory.sort((a, b) => {
+                        const timeA = a.sortTime?.toDate?.() || new Date(0);
+                        const timeB = b.sortTime?.toDate?.() || new Date(0);
+                        return timeB - timeA;
+                    });
+                    
+                    chatHistory = chatHistory.slice(0, 50);
+                }
+
+                document.getElementById('statChats').textContent = chatHistory.length;
+                renderHistoryList();
+            } catch (error) {
+                console.error('Error loading history:', error);
+                document.getElementById('statChats').textContent = '0';
+                document.getElementById('historyList').innerHTML = '<div class="empty-state">Error loading history. Please refresh.</div>';
+                
+                if (error.code === 'permission-denied') {
+                    showToast('Permission denied. Check security rules.', 'error');
+                }
+            }
+        }
+
+        function renderHistoryList() {
+            const list = document.getElementById('historyList');
+            if (chatHistory.length === 0) {
+                list.innerHTML = '<div class="empty-state">No chat history yet</div>';
+                return;
+            }
+
+            list.innerHTML = chatHistory.map(chat => {
+                let dateStr = 'Unknown date';
+                try {
+                    const date = chat.sortTime?.toDate?.() || new Date(chat.sortTime?.seconds * 1000) || new Date();
+                    dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                } catch (e) {
+                    console.error('Date parsing error:', e);
+                }
+                
+                const title = escapeHtml(chat.title || 'Untitled Chat').substring(0, 40);
+                return `
+                    <div class="history-item" onclick="loadChat('${chat.id}')">
+                        <div class="history-title">${title}</div>
+                        <div class="history-date">${dateStr}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function loadChat(chatId) {
+            if (isGenerating) {
+                showToast('Please stop current generation first', 'info');
+                return;
+            }
+
+            const chat = chatHistory.find(c => c.id === chatId);
+            if (!chat) return;
+
+            currentChatId = chatId;
+            conversationHistory = chat.messages || [];
+
+            const container = document.getElementById('chatContainer');
+            container.innerHTML = '';
+
+            conversationHistory.forEach((msg, index) => {
+                displayMessage({
+                    role: msg.role,
+                    content: msg.content,
+                    timestamp: new Date(),
+                    id: 'hist-' + index
+                });
+            });
+
+            closeModal('historyModal');
+            toggleSidebar();
+        }
+
+        function openHistoryModal() {
+            renderHistoryList();
+            document.getElementById('historyModal').classList.add('active');
+            toggleSidebar();
+        }
+
+        async function saveChat() {
+            if (!currentUser || conversationHistory.length === 0) return;
+
+            try {
+                const firstUserMsg = conversationHistory.find(m => m.role === 'user');
+                const title = firstUserMsg?.content?.substring(0, 40) + (firstUserMsg?.content?.length > 40 ? '...' : '') || 'New Chat';
+
+                const data = {
+                    userId: currentUser.uid,
+                    messages: conversationHistory,
+                    title: title,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                if (currentChatId) {
+                    await db.collection('chats').doc(currentChatId).update(data);
+                } else {
+                    data.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+                    const doc = await db.collection('chats').add(data);
+                    currentChatId = doc.id;
+                    chatHistory.unshift({ id: doc.id, ...data, sortTime: new Date() });
+                    document.getElementById('statChats').textContent = chatHistory.length;
+                }
+            } catch (error) {
+                console.error('Error saving chat:', error);
+            }
+        }
+
+        // ==========================================
+        // SETTINGS
+        // ==========================================
+        function openSettingsModal() {
+            document.getElementById('settingsModal').classList.add('active');
+            toggleSidebar();
+        }
+
+        function setLanguage(lang) {
+            languagePreference = lang;
+            localStorage.setItem('language', lang);
+            showToast(`Language: ${lang === 'auto' ? 'Auto' : lang === 'bn' ? 'Bengali' : 'English'}`, 'success');
+            closeModal('settingsModal');
+        }
+
+        // ==========================================
+        // MEMORY MODAL
+        // ==========================================
+        function openMemoryModal() {
+            const panel = document.getElementById('memoryPanel');
+            if (Object.keys(persistentMemory).length === 0) {
+                panel.innerHTML = '<div class="empty-state">No memories stored yet. AI will remember your preferences across conversations.</div>';
+            } else {
+                panel.innerHTML = Object.entries(persistentMemory).map(([key, value]) => `
+                    <div class="memory-item">
+                        <i class="fas fa-brain" style="color: var(--primary);"></i>
+                        <div>
+                            <div class="memory-key">${escapeHtml(key)}</div>
+                            <div class="memory-value">${escapeHtml(value)}</div>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            document.getElementById('memoryModal').classList.add('active');
+            toggleSidebar();
+        }
+
+        function clearMemory() {
+            if (!confirm('Clear all memories?')) return;
+            persistentMemory = {};
+            localStorage.removeItem('persistentMemory');
+            if (currentUser) {
+                db.collection('users').doc(currentUser.uid).update({
+                    memory: {}
+                }).catch(err => console.error('Error clearing memory:', err));
+            }
+            document.getElementById('memoryPanel').innerHTML = '<div class="empty-state">No memories stored yet.</div>';
+            showToast('Memory cleared', 'success');
+        }
+
+        // ==========================================
+        // CANVAS MODE
+        // ==========================================
+        function openCanvasModal() {
+            document.getElementById('canvasModal').classList.add('active');
+            toggleSidebar();
+        }
+
+        function switchCanvasTab(tab) {
+            document.querySelectorAll('.canvas-tab').forEach(t => t.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        function copyCanvasContent() {
+            const editor = document.getElementById('canvasEditor');
+            navigator.clipboard.writeText(editor.value).then(() => {
+                showToast('Copied to clipboard', 'success');
+            });
+        }
+
+        function askAIAboutCanvas() {
+            const content = document.getElementById('canvasEditor').value;
+            if (!content.trim()) {
+                showToast('Please write something first', 'info');
+                return;
+            }
+            
+            document.getElementById('messageInput').value = `Please improve this: ${content}`;
+            closeModal('canvasModal');
+            sendMessage();
+        }
+
+        // ==========================================
+        // DEVELOPER MODAL
+        // ==========================================
+        function openDeveloperModal() {
+            document.getElementById('developerModal').classList.add('active');
+            toggleSidebar();
+        }
+
+        // ==========================================
+        // MODAL MANAGEMENT
+        // ==========================================
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        function logout() {
+            if (confirm('Are you sure you want to logout?')) {
+                stopGeneration();
+                stopVoiceRecording();
+                auth.signOut().then(() => {
+                    showToast('Logged out successfully', 'info');
+                }).catch(err => {
+                    showToast('Error logging out', 'error');
+                });
+            }
+        }
+
+        function autoResize(textarea) {
+            textarea.style.height = 'auto';
+            textarea.style.height = Math.min(textarea.scrollHeight, 100) + 'px';
+        }
+
+        // ==========================================
+        // EVENT LISTENERS
+        // ==========================================
+        function setupEventListeners() {
+            document.getElementById('messageInput').addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    if (e.shiftKey) {
+                        return;
+                    } else {
+                        e.preventDefault();
+                        if (!isGenerating) {
+                            sendMessage();
+                        }
+                    }
+                }
+            });
+
+            document.querySelectorAll('.modal-overlay').forEach(modal => {
+                modal.addEventListener('click', (e) => {
+                    if (e.target === modal) modal.classList.remove('active');
+                });
+            });
+
+            window.addEventListener('beforeunload', (e) => {
+                if (isGenerating) {
+                    e.preventDefault();
+                    e.returnValue = '';
+                }
+                if (streamingTimeout) {
+                    clearTimeout(streamingTimeout);
+                }
+                if (recognition) {
+                    recognition.stop();
+                }
+            });
+
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden && isGenerating) {
+                    console.log('Tab hidden, generation continues in background');
+                }
+            });
+        }
+    </script>
+</body>
+</html>
